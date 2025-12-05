@@ -1,0 +1,18 @@
+# Terraform directories
+.terraform/
+
+# Crash logs
+crash.log
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Optional: Ignore lock file if you don't want it in git
+.terraform.lock.hcl
