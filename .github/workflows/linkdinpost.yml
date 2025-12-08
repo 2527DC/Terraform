@@ -1,0 +1,51 @@
+name: Post to LinkedIn on Changes
+
+on:
+    push:
+        branches:
+            - main
+            - dev
+        paths:
+            - "post.txt"
+
+jobs:
+    linkedin-post:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v3
+
+            - name: Read post content
+              id: readfile
+              run: |
+                  content=$(cat post.txt)
+                  echo "POST_TEXT<<EOF" >> $GITHUB_ENV
+                  echo "$content" >> $GITHUB_ENV
+                  echo "EOF" >> $GITHUB_ENV
+
+            - name: Post to LinkedIn
+              run: |
+                  echo "Posting to LinkedIn with content from post.txt..."
+
+                  curl -X POST "https://api.linkedin.com/v2/ugcPosts" \
+                    -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
+                    -H "Content-Type: application/json" \
+                    -d "{
+                      \"author\": \"urn:li:person:YOUR_LINKEDIN_PERSON_ID\",
+                      \"lifecycleState\": \"PUBLISHED\",
+                      \"specificContent\": {
+                        \"com.linkedin.ugc.ShareContent\": {
+                          \"shareCommentary\": {
+                            \"text\": \"${POST_TEXT}\"
+                          },
+                          \"shareMediaCategory\": \"NONE\"
+                        }
+                      },
+                      \"visibility\": {
+                        \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"
+                      }
+                    }"
+
+            - name: Done
+              run: echo "LinkedIn post sent successfully!"
