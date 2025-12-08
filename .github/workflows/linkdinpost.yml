@@ -16,36 +16,65 @@ jobs:
             - name: Checkout Repository
               uses: actions/checkout@v3
 
-            - name: Read post content
+            # Read post.txt and escape content safely
+            - name: Read and Escape post content
               id: readfile
               run: |
-                  content=$(cat post.txt)
-                  echo "POST_TEXT<<EOF" >> $GITHUB_ENV
-                  echo "$content" >> $GITHUB_ENV
-                  echo "EOF" >> $GITHUB_ENV
+                  RAW_CONTENT=$(cat post.txt)
+                  ESCAPED_CONTENT=$(printf '%s' "$RAW_CONTENT" | jq -Rs .)
+                  echo "ESCAPED_POST_TEXT=$ESCAPED_CONTENT" >> $GITHUB_ENV
 
+            # 🔥 NEW: Dynamically get LinkedIn User ID (no need for URN secret)
+            - name: Get LinkedIn User ID (URN)
+              id: getuser
+              run: |
+                  USERINFO=$(curl -s -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" https://api.linkedin.com/v2/userinfo)
+
+                  echo "Userinfo Response: $USERINFO"
+
+                  USER_ID=$(echo $USERINFO | jq -r '.sub')
+
+                  if [ "$USER_ID" = "null" ] || [ -z "$USER_ID" ]; then
+                    echo "❌ Failed to get LinkedIn User ID"
+                    exit 1
+                  fi
+
+                  URN="urn:li:person:$USER_ID"
+                  echo "LINKEDIN_URN=$URN" >> $GITHUB_ENV
+
+                  echo "Using URN: $URN"
+
+            # Post to LinkedIn
             - name: Post to LinkedIn
               run: |
-                  echo "Posting to LinkedIn with content from post.txt..."
+                  echo "Posting to LinkedIn..."
 
-                  curl -X POST "https://api.linkedin.com/v2/ugcPosts" \
+                  RESPONSE=$(curl -s -w "%{http_code}" -o response.json \
+                    -X POST "https://api.linkedin.com/v2/ugcPosts" \
                     -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
+                    -H "X-Restli-Protocol-Version: 2.0.0" \
                     -H "Content-Type: application/json" \
                     -d "{
-                      \"author\": \"urn:li:person:YOUR_LINKEDIN_PERSON_ID\",
+                      \"author\": \"${{ env.LINKEDIN_URN }}\",
                       \"lifecycleState\": \"PUBLISHED\",
                       \"specificContent\": {
                         \"com.linkedin.ugc.ShareContent\": {
-                          \"shareCommentary\": {
-                            \"text\": \"${POST_TEXT}\"
-                          },
+                          \"shareCommentary\": { \"text\": ${ESCAPED_POST_TEXT} },
                           \"shareMediaCategory\": \"NONE\"
                         }
                       },
                       \"visibility\": {
                         \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"
                       }
-                    }"
+                    }")
 
-            - name: Done
-              run: echo "LinkedIn post sent successfully!"
+                  echo "LinkedIn Response:"
+                  cat response.json
+                  echo "Status Code: $RESPONSE"
+
+                  if [ "$RESPONSE" -ne 201 ]; then
+                    echo "❌ LinkedIn API failed with status $RESPONSE"
+                    exit 1
+                  fi
+
+                  echo "✅ Successfully posted to LinkedIn!"

@@ -1,1 +1,11 @@
-CICD linkedin Post
+
+Automating LinkedIn Posting Using GitHub Actions
+
+I recently implemented automation for posting content to LinkedIn using GitHub Actions. Initially, the LinkedIn API required a manual login for the first post, and the access token generated during that process was valid for only a couple of minutes. Because of this short validity, the token could not be used reliably in a CI/CD workflow.
+
+After further research, I was able to generate a long-lived access token that remains valid for up to two months. With this token, I successfully integrated the LinkedIn posting API into a GitHub Actions pipeline.
+
+Now, whenever the configured triggers are met, GitHub Actions automatically reads the content from post.txt and publishes it to LinkedIn without any manual steps. Token management is handled securely using GitHub Secrets, and the automation works consistently.
+
+This update has made the posting process fully automated, more reliable, and easier to manage, reducing the need for manual intervention and improving workflow efficiency.
+
