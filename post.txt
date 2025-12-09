@@ -1,3 +1,7 @@
-BENEFIT -> 1 Output gets written automatically
-2 Format is clean JSON
-3 You can use it for scripting, automation, logging ( BUT HOW )
+🚀 Learning Terraform: Basics + Real Use Cases!
+
+I recently dove into Terraform, the Infrastructure as Code tool that’s transforming how we manage cloud infrastructure. Over the past few weeks, I’ve learned:
+
+Terraform Basics: variables, providers, resources, modules, and outputs
+
+Key takeaway: Terraform isn’t just code — it’s a mindset for managing infrastructure efficiently!
