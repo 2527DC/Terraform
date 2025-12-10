@@ -1,7 +1,43 @@
-🚀 Learning Terraform: Basics + Real Use Cases!
 
-I recently dove into Terraform, the Infrastructure as Code tool that’s transforming how we manage cloud infrastructure. Over the past few weeks, I’ve learned:
+🚀 Mastering Terraform Variables — A Must-Know for Every DevOps Engineer
+------------------------------------------------------------------------
 
-Terraform Basics: variables, providers, resources, modules, and outputs
+Terraform variables play a major role in creating reusable and scalable infrastructure. Instead of writing different 
+code for each environment, we can simply pass values dynamically using variables — keeping the project clean and consistent.
 
-Key takeaway: Terraform isn’t just code — it’s a mindset for managing infrastructure efficiently!
+
+In Terraform, we usually declare variables inside a file like "variables.tf", where we define:
+********************************************************************************************
+
+* Variable name
+* Type
+* Description
+* Default value
+
+This allows us to use one project for different environments (dev, test, prod) without modifying the main code.
+*******************************************************************************************************
+
+Terraform allows us to override default values using .tfvars files such as: (Using .tfvars Files)
+****************************************************************************************************
+
+* dev.tfvars
+* prod.tfvars
+* staging.tfvars
+
+This helps maintain a single codebase while customizing values for each environment.
+*************************************************************************************
+
+
+Important Note When Using Modules
+*********************************
+
+A very common mistake:  Variables declared inside a module are only available inside that module. 
+They are NOT automatically available in the root module.So when variables are declared inside 
+"modules/vpc/variables.tf", Terraform will not apply values from the root .tfvars file unless the 
+root module also declares and passes them.
+
+Correct Approach:
+
+* Declare variables inside the module
+* Declare the same variables in the root module
+* Pass values from the root module into the module

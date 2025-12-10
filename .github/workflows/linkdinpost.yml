@@ -1,80 +1,98 @@
 name: Post to LinkedIn on Changes
 
 on:
-    push:
-        branches:
-            - main
-            - dev
-        paths:
-            - "post.txt"
+  push:
+    branches:
+      - main
+      - dev
+    paths:
+      - "post.txt"
+      - "myimage.png"
 
 jobs:
-    linkedin-post:
-        runs-on: ubuntu-latest
+  linkedin-post:
+    runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v3
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
 
-            # Read post.txt and escape content safely
-            - name: Read and Escape post content
-              id: readfile
-              run: |
-                  RAW_CONTENT=$(cat post.txt)
-                  ESCAPED_CONTENT=$(printf '%s' "$RAW_CONTENT" | jq -Rs .)
-                  echo "ESCAPED_POST_TEXT=$ESCAPED_CONTENT" >> $GITHUB_ENV
+      - name: Read and Escape post content
+        id: readfile
+        run: |
+          RAW_CONTENT=$(cat post.txt)
+          ESCAPED_CONTENT=$(printf '%s' "$RAW_CONTENT" | jq -Rs .)
+          echo "ESCAPED_POST_TEXT=$ESCAPED_CONTENT" >> $GITHUB_ENV
 
-            # 🔥 NEW: Dynamically get LinkedIn User ID (no need for URN secret)
-            - name: Get LinkedIn User ID (URN)
-              id: getuser
-              run: |
-                  USERINFO=$(curl -s -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" https://api.linkedin.com/v2/userinfo)
+      - name: Get LinkedIn User ID
+        id: getuser
+        run: |
+          USERINFO=$(curl -s \
+            -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
+            https://api.linkedin.com/v2/userinfo)
 
-                  echo "Userinfo Response: $USERINFO"
+          USER_ID=$(echo $USERINFO | jq -r '.sub')
+          URN="urn:li:person:$USER_ID"
+          echo "LINKEDIN_URN=$URN" >> $GITHUB_ENV
 
-                  USER_ID=$(echo $USERINFO | jq -r '.sub')
+      # 1️⃣ Register upload
+      - name: Register Image Upload
+        id: register
+        run: |
+          RESPONSE=$(curl -s -X POST \
+            "https://api.linkedin.com/v2/assets?action=registerUpload" \
+            -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"registerUploadRequest\": {
+                \"recipes\": [\"urn:li:digitalmediaRecipe:feedshare-image\"],
+                \"owner\": \"${{ env.LINKEDIN_URN }}\",
+                \"serviceRelationships\": [{
+                  \"relationshipType\": \"OWNER\",
+                  \"identifier\": \"urn:li:userGeneratedContent\"
+                }]
+              }
+            }")
 
-                  if [ "$USER_ID" = "null" ] || [ -z "$USER_ID" ]; then
-                    echo "❌ Failed to get LinkedIn User ID"
-                    exit 1
-                  fi
+          UPLOAD_URL=$(echo $RESPONSE | jq -r '.value.uploadMechanism."com.linkedin.digitalmedia.uploading.MediaUploadHttpRequest".uploadUrl')
+          ASSET_URN=$(echo $RESPONSE | jq -r '.value.asset')
 
-                  URN="urn:li:person:$USER_ID"
-                  echo "LINKEDIN_URN=$URN" >> $GITHUB_ENV
+          echo "UPLOAD_URL=$UPLOAD_URL" >> $GITHUB_ENV
+          echo "ASSET_URN=$ASSET_URN" >> $GITHUB_ENV
 
-                  echo "Using URN: $URN"
+      # 2️⃣ Upload image file
+      - name: Upload Image
+        run: |
+          curl -s -X PUT \
+            -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
+            -H "Content-Type: image/jpeg" \
+            --data-binary "@myimage.png" \
+            "${UPLOAD_URL}"
 
-            # Post to LinkedIn
-            - name: Post to LinkedIn
-              run: |
-                  echo "Posting to LinkedIn..."
-
-                  RESPONSE=$(curl -s -w "%{http_code}" -o response.json \
-                    -X POST "https://api.linkedin.com/v2/ugcPosts" \
-                    -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
-                    -H "X-Restli-Protocol-Version: 2.0.0" \
-                    -H "Content-Type: application/json" \
-                    -d "{
-                      \"author\": \"${{ env.LINKEDIN_URN }}\",
-                      \"lifecycleState\": \"PUBLISHED\",
-                      \"specificContent\": {
-                        \"com.linkedin.ugc.ShareContent\": {
-                          \"shareCommentary\": { \"text\": ${ESCAPED_POST_TEXT} },
-                          \"shareMediaCategory\": \"NONE\"
-                        }
-                      },
-                      \"visibility\": {
-                        \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"
-                      }
-                    }")
-
-                  echo "LinkedIn Response:"
-                  cat response.json
-                  echo "Status Code: $RESPONSE"
-
-                  if [ "$RESPONSE" -ne 201 ]; then
-                    echo "❌ LinkedIn API failed with status $RESPONSE"
-                    exit 1
-                  fi
-
-                  echo "✅ Successfully posted to LinkedIn!"
+      # 3️⃣ Create LinkedIn post with image
+      - name: Post to LinkedIn
+        run: |
+          curl -s -X POST \
+            "https://api.linkedin.com/v2/ugcPosts" \
+            -H "Authorization: Bearer ${{ secrets.LINKEDIN_ACCESS_TOKEN }}" \
+            -H "X-Restli-Protocol-Version: 2.0.0" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"author\": \"${{ env.LINKEDIN_URN }}\",
+              \"lifecycleState\": \"PUBLISHED\",
+              \"specificContent\": {
+                \"com.linkedin.ugc.ShareContent\": {
+                  \"shareCommentary\": { \"text\": ${ESCAPED_POST_TEXT} },
+                  \"shareMediaCategory\": \"IMAGE\",
+                  \"media\": [{
+                    \"status\": \"READY\",
+                    \"description\": { \"text\": \"Image attached\" },
+                    \"media\": \"${{ env.ASSET_URN }}\",
+                    \"title\": { \"text\": \"Post image\" }
+                  }]
+                }
+              },
+              \"visibility\": {
+                \"com.linkedin.ugc.MemberNetworkVisibility\": \"PUBLIC\"
+              }
+            }"

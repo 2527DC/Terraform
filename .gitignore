@@ -16,3 +16,4 @@ terraform.rc
 
 # Optional: Ignore lock file if you don't want it in git
 .terraform.lock.hcl
+terraform.tfstate 
