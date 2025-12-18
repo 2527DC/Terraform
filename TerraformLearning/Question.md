@@ -7,3 +7,9 @@ many can access this or ther will be only one handle that beacuse it is about th
 5Q -> what are the drawback of the State file in terraform
 6Q -> How can the Terraform drawbacks be handled
 7Q -> What is the effect of VS version contros system in terraform
+8Q -> How to hanel the terrafrom if there is already a infra in cloud provider and u need to manage that existing infra from the terraform (ie migration )
+9Q -> What is drift dettuction
+10q -> what is terafrom refresh
+
+Senario
+1q -> if some one make changes the infra manually in cloude provider how do u manage terrafrom
